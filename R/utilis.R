@@ -1,5 +1,22 @@
 library(tidyverse)
 
+## Helper function for spatial projections ##
+project_to_local_km <- function(longitude, latitude) {
+  stopifnot(length(longitude) == length(latitude))
+
+  lat0 <- mean(latitude)
+  lon0 <- mean(longitude)
+
+  out <- data.frame(
+    x_km = (longitude - lon0) * 111.32 * cos(lat0 * pi / 180),
+    y_km = (latitude  - lat0) * 111.32
+  )
+
+  attr(out, "lon0") <- lon0
+  attr(out, "lat0") <- lat0
+  out
+}
+
 #### Function to clean the data and prepare it for modeling ####
 clean_airbnb_data <- function(data_raw){
 
@@ -27,8 +44,6 @@ clean_airbnb_data <- function(data_raw){
     ) %>%
     ## Rename the covariates ##
     rename(
-      lan = latitude,
-      lon = longitude,
       neighbourhood = neighbourhood_cleansed,
       superhost     = host_is_superhost
     ) %>%
@@ -36,12 +51,19 @@ clean_airbnb_data <- function(data_raw){
       ## Recover the total time of host as host and host as user in months 
       host_months_host = (hosts_time_as_host_years * 12) + hosts_time_as_host_months,
       host_months_user = (hosts_time_as_user_years * 12) + hosts_time_as_user_months,
+
+      ## How long someone was on Airbnb as a guest before they ever became a host
+      guest_lead_months = pmax(host_months_user - host_months_host, 0),
       
       ## Fix the price feature Transform it into numerical value
       price = parse_number(price),
 
       ## Encode Superhost as 0 and 1 
-      superhost = ifelse(superhost == TRUE, 1, 0)
+      superhost = ifelse(superhost == TRUE, 1, 0),
+
+      ## Add the projected coordinates 
+      x_projected = project_to_local_km(longitude,latitude)$x,
+      y_projected = project_to_local_km(longitude,latitude)$y
     ) %>%
     ## Remove the Host features which were already used to create new features 
     select(-hosts_time_as_host_years,-hosts_time_as_host_months,-hosts_time_as_user_months,-hosts_time_as_user_years) %>%
@@ -117,31 +139,4 @@ viz_relan_z <- function(model_data, x_var, y_var, adjust){
     theme(
       title = element_text(size = 15)
     )
-}
-#### Simulation helper for location ####
-f_coordinates <- function(
-  n = 100,
-  eta = 1.5,
-  rho = 2.5
-){
-
-  # Generate lon and lat 
-  lon <- runif(n, min = 2.092, max = 2.221)
-  lat <- runif(n, min = 41.35, max = 41.46)
-  coord <- cbind(lon, lat)
-
-  # Build a distance matrix 
-  D <- as.matrix(dist(coord))
-
-  # Turn the Distance matrix into kernel
-  K <- eta^2 * exp(-D^2 / (2 * rho^2))
-  diag(K) <- diag(K) + 1e-6 
-
-  # Cholesky and draw the latent surface
-  L <- t(chol(K))
-  z <- rnorm(n, 0, 1)
-  f <- as.numeric(L %*% z)
-
-  # Return the GP f of coordinates 
-  return(f)
 }
