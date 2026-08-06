@@ -1,0 +1,97 @@
+
+// HSGP Functions ================================================
+// 1-D eigenfunction values for one axis: N x M
+matrix phi_1d(vector x, real L, int M) {
+    return sin(diag_post_multiply(rep_matrix(pi()/(2*L) * (x + L), M),
+    linspaced_vector(M, 1, M))) / sqrt(L);
+}
+
+// Diagnostics Functions ===========================================================
+// Gaussian outcome.
+//   y_fit : conditional means E[y|x] for this draw (the linear predictor `mu`)
+//   sigma : residual SD for this draw
+real bayes_R2_gaussian(vector y_fit, real sigma) {
+  real var_fit = variance(y_fit);
+  return var_fit / (var_fit + square(sigma));
+}
+
+// ---- Probability Integral Transform (calibration) --------------------------
+// For a well-calibrated continuous model, PIT values are ~ Uniform(0,1).
+// Plot a histogram / ECDF of these across observations & draws.
+vector normal_pit(vector y, vector mu, real sigma) {
+  int N = num_elements(y);
+  vector[N] u;
+  for (n in 1:N) u[n] = normal_cdf(y[n] | mu[n], sigma);
+  return u;
+}
+
+// Gaussian: mu is the conditional mean, sigma the residual SD.
+vector normal_predictive_rng(vector mu, real sigma) {
+  int N = num_elements(mu);
+  vector[N] y_rep;
+  for (n in 1:N) y_rep[n] = normal_rng(mu[n], sigma);
+  return y_rep;
+}
+
+// Effect Probabilities =============================================================
+// ---- Threshold / direction indicators (one draw) ---------------------------
+
+int effect_gt(real effect, real threshold) { return effect > threshold; }
+int effect_lt(real effect, real threshold) { return effect < threshold; }
+int is_positive(real effect)               { return effect > 0; }
+int is_negative(real effect)               { return effect < 0; }
+
+// Region Of Practical Equivalence: is the effect inside [lower, upper]?
+// Averaged across draws this is the posterior probability of practical null.
+int in_rope(real effect, real low, real up) {
+  return (effect >= low) && (effect <= up);
+}
+
+// Symmetric ROPE convenience: |effect| <= radius.
+int in_rope_symmetric(real effect, real radius) {
+  return (effect >= -radius) && (effect <= radius);
+}
+
+// ---- Effect-size summaries --------------------------------------------------
+
+// Standardized effect (Cohen's-d flavour): effect expressed in residual SDs.
+real standardized_effect(real effect, real sigma) {
+  return effect / sigma;
+}
+
+// ---- Heterogeneity over individual effects (one draw) ----------------------
+
+// Proportion of units that benefit (individual effect > 0) for this draw.
+real prop_positive(vector effects) {
+  int N = num_elements(effects);
+  int c = 0;
+  for (n in 1:N) c += effects[n] > 0;
+  return c * 1.0 / N;
+}
+
+// Proportion of units whose individual effect exceeds a threshold.
+real prop_exceeding(vector effects, real threshold) {
+  int N = num_elements(effects);
+  int c = 0;
+  for (n in 1:N) c += effects[n] > threshold;
+  return c * 1.0 / N;
+}
+
+// Scaling Functions ====================================================
+
+// ---- Z-score (standardize to mean 0, sd 1) ---------------------------------
+
+// Standardize using the vector's own mean and sample SD.
+vector zscore(vector x) {
+  return (x - mean(x)) / sd(x);
+}
+
+// Invert a z-score back to the original units.
+vector unzscore(vector z, real loc, real scl) {
+  return z * scl + loc;
+}
+
+// ---- Centering only (keeps the original scale) -----------------------------
+vector center(vector x) {
+  return x - mean(x);
+}
