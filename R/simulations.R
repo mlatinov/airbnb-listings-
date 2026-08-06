@@ -89,7 +89,7 @@ simulate_cor_test_model <- function(
 
   ## Random Accommodates Slope
   baseline_acc_eff = 0.1,
-  sigma_acc_eff    = 0.05,
+  sigma_acc_eff    = 0.01,
 
   ## Correlation Index 
   cor_price_acc = 0.6, 
@@ -175,7 +175,7 @@ simulate_airbnb_v1 <- function(
   obs_per_neighbourhood = 100,
 
   ## Random price intercept 
-  baseline_price = log(130),
+  baseline_price = log(30),
   sigma_neighbourhood_price = 0.35,
   
   ## Random Super Host Slope
@@ -183,8 +183,8 @@ simulate_airbnb_v1 <- function(
   sigma_super_host_eff = 0.03,
 
   ## Random Accommodates Slope
-  baseline_acc_eff = 0.06,
-  sigma_acc_eff = 0.03,
+  baseline_acc_eff = 0.8,
+  sigma_acc_eff = 0.01,
 
   ## Correlation Index 
   cor_price_acc = 0.5,
@@ -200,10 +200,10 @@ simulate_airbnb_v1 <- function(
 
   ## Fixed covariates effects
   beta_guest_lead_months = 0.015,
-  beta_minimum_nights = 0.005,
+  beta_minimum_nights = -0.05,
 
   ## Observation Price variation 
-  sd_obs = 0.5
+  sd_obs = 0.1
 ){
   
   ## Create ids 
@@ -213,7 +213,7 @@ simulate_airbnb_v1 <- function(
   super_host   <- rbinom(length(ids), size = 1, prob = 0.27)
   accommodates <- pmin(rnbinom(length(ids), size = 3, mu = 3.8), 16)
   guest_lead_months <- rnbinom(length(ids), size = 0.2, mu = 9)
-  minimum_nights    <- rnbinom(length(ids), size = 0.5, mu = 13.5)
+  minimum_nights    <- rnbinom(length(ids), size = 1.2, mu = 13.5)
   room_type         <- sample(
     x = c("Entire home/apt","Hotel room", "Private room" ,"Shared room"),
     size = length(ids),
@@ -282,22 +282,18 @@ simulate_airbnb_v1 <- function(
   sim_data <- data.frame(
     ids = ids,
     price = price,
+    log_price = log(price),
     latitude = latitude,
     longitude = longitude,
     room_type = room_type,
-    super_host = super_host,
+    superhost = super_host,
     accommodates = accommodates,
     minimum_nights = minimum_nights,
     guest_lead_months = guest_lead_months
   )
   return(sim_data)
 }
-#### Simulate airbnb V2 adding and modeling non linear function to mimic better the sample ####
-simulate_airbnb_v2 <- function(
-  
-){
 
 
 
 
-}

@@ -19,7 +19,7 @@ list(
   tar_target(
     name = model_data,
     command = clean_airbnb_data(data_raw)
-  ),
+  )
   ## Create a Simulation for Stage 1 Only superhost price and location coordinates 
   
 )

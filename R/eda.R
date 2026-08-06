@@ -12,12 +12,6 @@ viz_dist(model_data, feature = "accommodates")
 ## ACC x RT
 viz_dist_cond(model_data = model_data, dist_feature = "accommodates", adjust = "room_type")
 
-# Log Transform the price # 
-log_price_model_data <- model_data %>%
-  mutate(
-    log_price = log(price)
-)
-
 ## Price x RT ## 
 ggplot(log_price_model_data, aes(x = log_price, fill = room_type))+
   geom_density(alpha = 0.5) +
@@ -61,27 +55,41 @@ ggplot(data = log_price_model_data ,aes(x = log_price, fill = as.factor(superhos
   )
 
 ### Log price vs Accommodates ##
-viz_relan(model_data = log_price_model_data, x_var = "accommodates", y_var = "log_price")
+viz_relan(model_data = model_data, x_var = "accommodates", y_var = "log_price")
 
 ### Log price vs Minimum Nights ##
-viz_relan(model_data = log_price_model_data, x_var = "minimum_nights", y_var = "log_price")
+viz_relan(model_data = model_data, x_var = "minimum_nights", y_var = "log_price")
 
-### Log price vs Host Monthy Host ##
-viz_relan(model_data = log_price_model_data, x_var = "host_months_host", y_var = "log_price")
-
-### Log price vs Host Months User ##
-viz_relan(model_data = log_price_model_data, x_var = "host_months_user", y_var = "log_price")
+### Log price vs Guest Lead Months ## 
+viz_relan(model_data = model_data, x_var = "guest_lead_months", y_var = "log_price")
 
 ### Log price x Super Host x ACC ### 
-viz_relan_z(model_data = log_price_model_data, x_var = "accommodates", y_var = "log_price",adjust = "superhost")
+viz_relan_z(model_data = model_data, x_var = "accommodates", y_var = "log_price",adjust = "superhost")
 
 ### Log price x Super Host x Minimum Nights ### 
-viz_relan_z(model_data = log_price_model_data, x_var = "minimum_nights", y_var = "log_price",adjust = "superhost")
+viz_relan_z(model_data = model_data, x_var = "minimum_nights", y_var = "log_price",adjust = "superhost")
 
-### Log price x Super Host x Host Monthy Host ### 
-viz_relan_z(model_data = log_price_model_data, x_var = "host_months_host", y_var = "log_price",adjust = "superhost")
+### Log price x Super Host x Guest Lead Months ### 
+viz_relan_z(model_data = model_data, x_var = "guest_lead_months", y_var = "log_price",adjust = "superhost")
 
-### Log price x Super Host x Host Monthy User ### 
-viz_relan_z(model_data = log_price_model_data, x_var = "host_months_user", y_var = "log_price",adjust = "superhost")
+#### Comparison between the Simulation Data and Sample ####
+sim_data <- simulate_airbnb_v1()
 
+## Compare Distributions ##
+comapare_dist(sim_data = sim_data, model_data = model_data, x_var = "log_price")
+comapare_dist(sim_data = sim_data, model_data = model_data, x_var = "accommodates")
+comapare_dist(sim_data = sim_data, model_data = model_data, x_var = "minimum_nights")
+comapare_dist(sim_data = sim_data, model_data = model_data, x_var = "guest_lead_months")
 
+## Compare Relantionships ##
+compare_relan(sim_data = sim_data, model_data = model_data, x_var = "accommodates", y_var = "log_price")
+compare_relan(sim_data = sim_data, model_data = model_data, x_var = "minimum_nights", y_var = "log_price")
+compare_relan(sim_data = sim_data, model_data = model_data, x_var = "guest_lead_months", y_var = "log_price")
+
+## Compare Relantionships between 3 variables 
+compare_relan_z(sim_data = sim_data, model_data = model_data, x_var = "accommodates", y_var = "log_price", z_var = "room_type")
+compare_relan_z(sim_data = sim_data, model_data = model_data, x_var = "accommodates", y_var = "log_price", z_var = "superhost")
+compare_relan_z(sim_data = sim_data, model_data = model_data, x_var = "minimum_nights", y_var = "log_price", z_var = "room_type")
+compare_relan_z(sim_data = sim_data, model_data = model_data, x_var = "minimum_nights", y_var = "log_price", z_var = "superhost")
+compare_relan_z(sim_data = sim_data, model_data = model_data, x_var = "guest_lead_months", y_var = "log_price", z_var = "room_type")
+compare_relan_z(sim_data = sim_data, model_data = model_data, x_var = "guest_lead_months", y_var = "log_price", z_var = "superhost")

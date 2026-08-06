@@ -1,4 +1,6 @@
+#### Libraries ####
 library(tidyverse)
+library(patchwork)
 
 ## Helper function for spatial projections ##
 project_to_local_km <- function(longitude, latitude) {
@@ -6,7 +8,6 @@ project_to_local_km <- function(longitude, latitude) {
 
   lat0 <- mean(latitude)
   lon0 <- mean(longitude)
-
   out <- data.frame(
     x_km = (longitude - lon0) * 111.32 * cos(lat0 * pi / 180),
     y_km = (latitude  - lat0) * 111.32
@@ -57,6 +58,7 @@ clean_airbnb_data <- function(data_raw){
       
       ## Fix the price feature Transform it into numerical value
       price = parse_number(price),
+      log_price = log(price),
 
       ## Encode Superhost as 0 and 1 
       superhost = ifelse(superhost == TRUE, 1, 0),
@@ -139,4 +141,75 @@ viz_relan_z <- function(model_data, x_var, y_var, adjust){
     theme(
       title = element_text(size = 15)
     )
+}
+
+#### Functions to compare simulated data and model data ####
+compare_relan <- function(
+  sim_data,
+  model_data,
+  x_var,
+  y_var
+){
+  ## Sample viz 
+  sample_viz <- viz_relan(model_data = model_data, x_var = x_var, y_var = y_var) +
+    labs(title = "Sample Data")
+
+  ## Simulation data viz 
+  sim_viz  <- viz_relan(model_data = sim_data, x_var = x_var, y_var = y_var) +
+    labs(title = "Simulated Data")
+
+  ## Combine the Viz ##
+  compare <- (sample_viz / sim_viz) + plot_annotation(
+    title = "Comparison betweem Simulated Model Data and Sample Data",
+    theme = theme(
+      title = element_text(size = 15)
+    )
+  ) 
+  return(compare)
+}
+comapare_dist <- function(
+  sim_data,
+  model_data,
+  x_var
+){
+  ## Sample viz 
+  sample_viz <- viz_dist(model_data = model_data, feature = x_var) +
+    labs(title = "Sample Data")
+
+  ## Simulated viz
+  sim_viz <- viz_dist(model_data = sim_data, feature = x_var) +
+    labs(title = "Simulated Data")
+
+  ## Combine the Viz ##
+  compare <- (sample_viz / sim_viz) + plot_annotation(
+    title = "Comparison betweem Simulated Model Data and Sample Data",
+    theme = theme(
+      title = element_text(size = 15)
+    )
+  )
+  return(compare)
+}
+compare_relan_z <- function(
+  sim_data,
+  model_data,
+  x_var,
+  y_var,
+  z_var
+){
+  ## Sample Data
+  sample_viz <- viz_relan_z(model_data = model_data, x_var = x_var, y_var = y_var, adjust = z_var) +
+    labs(title = "Sample Data")
+
+  ## Simulated Data 
+  sim_viz <- viz_relan_z(model_data = sim_data, x_var = x_var, y_var = y_var, adjust = z_var) +
+    labs(title = "Simulated Data")
+
+  ## Combine the Viz ##
+  compare <- (sample_viz / sim_viz) + plot_annotation(
+    title = "Comparison betweem Simulated Model Data and Sample Data",
+    theme = theme(
+      title = element_text(size = 15)
+    )
+  )
+  return(compare)
 }
