@@ -36,7 +36,7 @@ transformed data {
 
    // Tensor product Basis 
    matrix[N, M] Phi;
-   vector[N] lambda;
+   vector[M] lambda;
 
    {
     int m = 1;
@@ -58,7 +58,7 @@ parameters{
 
     // Random Super Host Slope Parameters 
     real alpha_super_host_eff;
-    real sd_neighbourhoods_super_host;
+    real <lower = 0.001> sd_neighbourhoods_super_host;
     vector[N_neighbourhoods] z_super_host;
 
     // HSGP 2D Paramters 
@@ -81,8 +81,18 @@ transformed parameters {
    vector[N] f_location;
    {
     vector[M] sqrt_spd = alpha_gp * sqrt(2 * pi()) * rho_gp * exp(-0.25 * square(rho_gp) * lambda);
+
     f_location = Phi * (sqrt_spd .* z_gp);
    }
+
+   // Linear Predictor 
+   vector[N] mu;
+        for(i in 1:N){
+            mu[i] = alpha_j[neighbourhoods_id[i]] 
+                    + beta_j[neighbourhoods_id[i]] * super_host[i]
+                    + f_location[i];
+        }
+
 }
 // Model 
 model{
@@ -106,17 +116,25 @@ model{
 
     // Model Likelihood 
     if(prior_only == 0){
-        vector[N] mu;
-        for(i in 1:N){
-            mu[i] = alpha_j[neighbourhoods_id[i]] 
-                    + beta_j[neighbourhoods_id[i]] * super_host[i]
-                    + f_location[i];
-        }
-    // Sample log_price from Normal Distribution 
-    log_price ~ normal(mu, sd_obs);
+        // Sample log_price from Normal Distribution 
+        log_price ~ normal(mu, sd_obs);
     }
 }
 // Minimal Generated Quantities 
 generated quantities {
-   
+    vector[N] log_lik;
+    vector[N] log_price_rep;
+    vector[N] price_rep;
+    vector[N_neighbourhoods] neighbourhood_multiplier;
+
+    for(i in 1:N){
+        log_lik[i]       = normal_lpdf(log_price[i] | mu[i], sd_obs);
+        log_price_rep[i] = normal_rng(mu[i], sd_obs);
+        price_rep[i]     = exp(log_price_rep[i]);
+    }
+
+    for(j in 1:N_neighbourhoods){
+        neighbourhood_multiplier[j] = exp(alpha_j[j]);
+    }
+
 }

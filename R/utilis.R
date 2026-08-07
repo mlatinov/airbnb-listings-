@@ -65,7 +65,10 @@ clean_airbnb_data <- function(data_raw){
 
       ## Add the projected coordinates 
       x_projected = project_to_local_km(longitude,latitude)$x,
-      y_projected = project_to_local_km(longitude,latitude)$y
+      y_projected = project_to_local_km(longitude,latitude)$y,
+
+      ## Transform the groping variable as numeric 
+      neighbourhoods_id = as.integer(as.factor(neighbourhood))
     ) %>%
     ## Remove the Host features which were already used to create new features 
     select(-hosts_time_as_host_years,-hosts_time_as_host_months,-hosts_time_as_user_months,-hosts_time_as_user_years) %>%
