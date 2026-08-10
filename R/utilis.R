@@ -28,6 +28,7 @@ clean_airbnb_data <- function(data_raw){
       latitude,
       longitude,
       neighbourhood_cleansed,
+      neighbourhood_group_cleansed,
       ## Room Features ##
       bathrooms,
       bedrooms,
@@ -45,8 +46,9 @@ clean_airbnb_data <- function(data_raw){
     ) %>%
     ## Rename the covariates ##
     rename(
-      neighbourhood = neighbourhood_cleansed,
-      superhost     = host_is_superhost
+      neighbourhood       = neighbourhood_cleansed,
+      neighbourhood_group = neighbourhood_group_cleansed,
+      superhost           = host_is_superhost
     ) %>%
     mutate(
       ## Recover the total time of host as host and host as user in months 
@@ -68,7 +70,8 @@ clean_airbnb_data <- function(data_raw){
       y_projected = project_to_local_km(longitude,latitude)$y,
 
       ## Transform the groping variable as numeric 
-      neighbourhoods_id = as.integer(as.factor(neighbourhood))
+      neighbourhoods_id = as.integer(as.factor(neighbourhood)),
+      neighbourhood_group_id = as.integer(as.factor(neighbourhood_group))
     ) %>%
     ## Remove the Host features which were already used to create new features 
     select(-hosts_time_as_host_years,-hosts_time_as_host_months,-hosts_time_as_user_months,-hosts_time_as_user_years) %>%
