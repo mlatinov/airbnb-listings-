@@ -93,3 +93,101 @@ compare_relan_z(sim_data = sim_data, model_data = model_data, x_var = "minimum_n
 compare_relan_z(sim_data = sim_data, model_data = model_data, x_var = "minimum_nights", y_var = "log_price", z_var = "superhost")
 compare_relan_z(sim_data = sim_data, model_data = model_data, x_var = "guest_lead_months", y_var = "log_price", z_var = "room_type")
 compare_relan_z(sim_data = sim_data, model_data = model_data, x_var = "guest_lead_months", y_var = "log_price", z_var = "superhost")
+
+#### Map Viz #### 
+library(sf)
+library(leaflet)
+
+model_data %>%
+  summarise(
+    min_x = min(x_projected),
+    min_y = min(y_projected),
+    max_x = max(x_projected),
+    max_y = max(y_projected) 
+  )
+
+model_data %>%
+  summarise(
+    width_km =
+      (max(longitude, na.rm = TRUE) -
+       min(longitude, na.rm = TRUE)) *
+      111.32 *
+      cos(mean(latitude, na.rm = TRUE) * pi / 180),
+
+    height_km =
+      (max(latitude, na.rm = TRUE) -
+       min(latitude, na.rm = TRUE)) *
+      111.32
+  )
+
+## Create Sf object 
+sf_data_wgs84 <- model_data %>%
+  st_as_sf(coords = c("longitude", "latitude"), crs = 4326)
+
+pal <- colorNumeric(palette = "viridis", domain = sf_data_wgs84$log_price)
+
+#### Point pattern / density
+
+leaflet(data = sf_data_wgs84) %>%
+  addTiles() %>%
+  addCircleMarkers(
+    radius = 4,
+    color  = ~pal(log_price), 
+    stroke = FALSE,
+    popup = ~paste0(
+      "Price: $", price, "<br>",
+      "Neighborhood: ", neighbourhood ,"<br>",
+      "Type: ", room_type
+    )
+  )
+
+leaflet(sf_data_wgs84) %>%
+  addTiles() %>%
+  addCircleMarkers(
+    radius = 4,
+    stroke = FALSE,
+    fillOpacity = 0.5,
+    clusterOptions = markerClusterOptions()
+  )
+
+## Choropleth
+
+# Get the neighbourhoods spatial 
+sf::sf_use_s2(FALSE)
+neighbourhood <- sf::read_sf("data/neighbourhoods.geojson")
+neighbourhood <- st_make_valid(neighbourhood)
+
+# Join 
+sf_joined <- sf::st_join(sf_data_wgs84, neighbourhood)
+sf::sf_use_s2(TRUE)
+
+# Aggregate
+sf_agg_group <- sf_joined %>%
+  st_drop_geometry() %>%
+  group_by(neighbourhood_group) %>%
+  summarise(
+    median_price = median(price),
+    n = n()
+  )
+sf_agg_ni <- sf_joined %>%
+  st_drop_geometry() %>%
+  group_by(neighbourhood.x) %>%
+  summarise(
+    median_price = median(price),
+    n = n()
+  )
+
+# Rejoin with stats
+choropleth_data <- neighbourhood %>%
+  left_join(sf_agg_group, by = "neighbourhood_group")
+
+pal <- colorNumeric("YlOrRd", domain = choropleth_data$median_price)
+
+leaflet(choropleth_data) %>%
+  addProviderTiles(providers$CartoDB.Positron) %>%
+  addPolygons(
+    fillColor = ~pal(median_price),
+    fillOpacity = 0.7, weight = 1, color = "white",
+    label = ~paste0(neighbourhood, ": $", round(median_price))
+  ) %>%
+  addLegend(pal = pal, values = ~median_price)
