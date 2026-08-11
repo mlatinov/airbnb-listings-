@@ -38,20 +38,20 @@ sim_simple_price_model <- function(
   )
 
   ## Simulate Super Host Informed from the data 
-  super_host <- rbinom(length(ids), size = 1, prob = 0.27)
+  super_host <- rbinom(nrow(ids), size = 1, prob = 0.27)
 
   ### Model paramters ###
 
   # Random intercepts
   alpha_neighbourhood_group <- sigma_neighbourhood_group_price * rnorm(length(unique(ids$neighbourhood_group_id)), 0, 1)
-  alpha_neighbourhood <- sigma_neighbourhood_price * rnorm(length(unique(ids$neighbourhoods_id)), 0, 1)
+  alpha_neighbourhood       <- sigma_neighbourhood_price * rnorm(length(unique(ids$neighbourhoods_id)), 0, 1)
 
   # Random Super Host Slope 
   b_super_host_neighbourhood <- baseline_super_host_eff + sigma_super_host_eff * rnorm(length(alpha_neighbourhood_group), 0, 1)
 
   # Project the coordinates 
-  latitude  <- runif(length(ids), 41.35, 41.46)
-  longitude <- runif(length(ids), 2.092, 2.221)
+  latitude  <- runif(nrow(ids), 41.35, 41.46)
+  longitude <- runif(nrow(ids), 2.092, 2.221)
   coords <- project_to_local_km(longitude, latitude)
   
   # Location effect computed with 2D HSGP over the coordinates 
@@ -75,20 +75,20 @@ sim_simple_price_model <- function(
   )
 
   # Sample price from LogNormal Distribution 
-  price <- exp(rnorm(length(ids$i_id), mean = mu_i, sd = sd_obs))
+  price <- exp(rnorm(nrow(ids), mean = mu_i, sd = sd_obs))
 
   # Return the simulation data 
   sim_data <- data.frame(
     latitude   = latitude,
     longitude  = longitude,
-    y_km  = coords$y_km,
-    x_km  = coords$x_km,
-    super_host = super_host,
+    y_projected  = coords$y_km,
+    x_projected  = coords$x_km,
+    superhost    = super_host,
     price      = price,
     log_price  = log(price),
-    i = ids$i_id,
+    i                      = ids$i_id,
     neighbourhood_group_id = ids$neighbourhood_group_id,
-    neighbourhoods_id      = ids$neighbourhoods_id,
+    neighbourhoods_id      = ids$neighbourhoods_id
   )
   return(sim_data)
 }
@@ -96,9 +96,9 @@ sim_simple_price_model <- function(
 #### Simulate price ~ a + aj + ak + bjxi + yjxi + f(lat, lon) ... where aj,bj,yj are correlated in the simulation ###
 simulate_cor_test_model <- function(
   ## Settings 
-  n_neighbourhood_groups = 6,
-  n_neighbourhoods = 10,
-  obs_per_neighbourhood = 50,
+  n_neighbourhood_groups = 10,
+  n_neighbourhoods       = 69,
+  obs_per_neighbourhood  = 10,
 
   ## Random price intercept  
   baseline_price = log(240),
@@ -139,8 +139,8 @@ simulate_cor_test_model <- function(
   )
   
   # Simulate Covariates Superhost and accommodates from Bernoulli and Negative Binomial Distribution 
-  super_host   <- rbinom(length(ids), size = 1, prob = 0.27)
-  accommodates <- pmin(rnbinom(length(ids), size = 3, mu = 3.8), 16)
+  super_host   <- rbinom(nrow(ids), size = 1, prob = 0.27)
+  accommodates <- pmin(rnbinom(nrow(ids), size = 3, mu = 3.8), 16)
   accommodates_c <- accommodates - mean(accommodates)
 
   ## Model Correlated parameters 
@@ -167,8 +167,8 @@ simulate_cor_test_model <- function(
   alpha_neighbourhoods <- sigma_neighbourhood_price * rnorm(length(unique(ids$neighbourhoods_id)), 0, 1)
 
   # Project the coordinates 
-  latitude  <- runif(length(ids), 41.35, 41.46)
-  longitude <- runif(length(ids), 2.092, 2.221)
+  latitude  <- runif(nrow(ids), 41.35, 41.46)
+  longitude <- runif(nrow(ids), 2.092, 2.221)
   coords    <- project_to_local_km(longitude, latitude)
   
   # Location effect computed with 2D HSGP over the coordinates 
@@ -192,18 +192,18 @@ simulate_cor_test_model <- function(
   )
     
   # Sample from Normal Distribution log price and transform it back 
-  price <- exp(rnorm(length(ids$i_id), mean = mu_i, sd = sd_obs))
+  price <- exp(rnorm(nrow(ids), mean = mu_i, sd = sd_obs))
 
   # Combine and return the simulated data 
   sim_data <- data.frame(
     i     = ids$i_id,
     price = price,
-    y_km  = coords$y_km,
-    x_km  = coords$x_km,
+    y_projected  = coords$y_km,
+    x_projected  = coords$x_km,
     log_price = log(price),
     latitude = latitude,
     longitude = longitude,
-    super_host = super_host,
+    superhost = super_host,
     accommodates = accommodates,
     neighbourhood_group_id = ids$neighbourhood_group_id,
     neighbourhoods_id      = ids$neighbourhoods_id
@@ -309,8 +309,8 @@ simulate_airbnb_v1 <- function(
   room_effect <- room_effects[room_type]
 
   # Project the coordinates 
-  latitude  <- runif(length(ids), 41.35, 41.46)
-  longitude <- runif(length(ids), 2.092, 2.221)
+  latitude  <- runif(nrow(ids), 41.35, 41.46)
+  longitude <- runif(nrow(ids), 2.092, 2.221)
   coords    <- project_to_local_km(longitude, latitude)
   
   # Location effect computed with 2D HSGP over the coordinates 

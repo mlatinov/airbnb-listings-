@@ -8,8 +8,10 @@ data{
     // Settings and Indexing 
     int <lower = 1> N;
     int <lower = 0, upper =1> prior_only;
-    int <lower = 2> N_neighbourhoods;
-    array[N] int neighbourhoods_id;
+    int <lower = 2> N_hoods;
+    int <lower = 2> N_hood_groups;
+    array[N] int  hoods_id;
+    array[N] int  hood_groups_id;
 
     // 2D HSGP Settings 
     int <lower = 1> M1;
@@ -19,99 +21,123 @@ data{
     real <lower = 0> c;
     
     // Covariates 
-    array[N] int <lower = 0, upper = 1> super_host;    
+    array[N] int <lower = 0, upper = 1  >   super_host;    
+    array[N] int <lower = 0, upper = 16 >   accommodates;
     
     // Outcome 
     vector[N] log_price;
 }
 // Data Transformations 
 transformed data {
-   // HSGP 2D Transformations ==============
-   int M = M1 * M2;
-   real Lx = c * max(abs(x_km)) + 1e-6;
-   real Ly = c * max(abs(y_km)) + 1e-6;
+    // Center the non indicator Numerical Covariates 
+    vector[N] accommodates_c = to_vector(accommodates) - mean(accommodates);
 
-   matrix[N, M1] Px = phi_1d(x_km, Lx, M1);
-   matrix[N, M2] Py = phi_1d(y_km, Ly, M2);
-
-   // Tensor product Basis 
-   matrix[N, M] Phi;
-   vector[M] lambda;
-
-   {
-    int m = 1;
-    for(j1 in 1:M1){
-        for(j2 in 1:M2){
-            Phi[, m] = Px[, j1] .* Py[, j2];
-            lambda[m] = square(j1 * pi() / (2*Lx)) + square(j2 * pi() / (2*Ly));
-            m += 1;
+    // HSGP 2D Transformations ==============
+    int M = M1 * M2;
+    real Lx = c * max(abs(x_km)) + 1e-6;
+    real Ly = c * max(abs(y_km)) + 1e-6;
+    
+    matrix[N, M1] Px = phi_1d(x_km, Lx, M1);
+    matrix[N, M2] Py = phi_1d(y_km, Ly, M2);
+    
+    // Tensor product Basis 
+    matrix[N, M] Phi;
+    vector[M] lambda;
+    {
+        int m = 1;
+        for(j1 in 1:M1){
+            for(j2 in 1:M2){
+                Phi[, m] = Px[, j1] .* Py[, j2];
+                lambda[m] = square(j1 * pi() / (2*Lx)) + square(j2 * pi() / (2*Ly));
+                m += 1;
+            }
         }
-    }
    }
 }
 // Model Parameters 
 parameters{
-    // Random Intercept Parameters
-    real alpha_log_price;
-    real <lower = 0.001> sd_neighbourhoods_log_price; 
-    vector[N_neighbourhoods] z_alpha;
+    // Random Correlated Intercept Hood Groups Parameters
+    real alpha_bar;
 
-    // Random Super Host Slope Parameters 
-    real alpha_super_host_eff;
-    real <lower = 0.001> sd_neighbourhoods_super_host;
-    vector[N_neighbourhoods] z_super_host;
+    // Random Correlated Super Host Slope Parameters 
+    real super_host_bar;
 
-    // HSGP 2D Paramters 
-    real <lower = 0> alpha_gp;
-    real <lower = 0> rho_gp;
-    vector[M] z_gp;
+    // Random Correlated Accommodates Slope Paramters 
+    real accommodates_bar;
+
+    // Correlation Between Hood Groups, Super Host and Accommodates specific paramters 
+    vector <lower = 0.001>[3] sds;
+    cholesky_factor_corr[3]   Lr;
+    matrix[3, N_hood_groups]  z_matrix;
+
+    // Random Intercept Hoods Parameters
+    real <lower = 0.001>   sd_hoods; 
+    vector[N_hoods]        z_hoods;
+
+    // HSGP 2D Parameters 
+    real <lower = 0>             alpha_gp;
+    real <lower = 0, upper = 30> rho_gp;
+    vector[M]                    z_gp;
 
     // Observation Variations 
     real <lower = 0.001> sd_obs;
 }
 // Transform Parameters 
 transformed parameters {
-   // Recover the Random Effects 
-   vector[N_neighbourhoods] alpha_j;
-   vector[N_neighbourhoods] beta_j;
-   alpha_j = alpha_log_price + sd_neighbourhoods_log_price * z_alpha;
-   beta_j  = alpha_super_host_eff + sd_neighbourhoods_super_host * z_super_host;
+    // Recover the Correlation effect 
+    matrix[3, N_hood_groups] omega = diag_pre_multiply(sds, Lr) * z_matrix;
 
-   // Recover HSGP 2D 
-   vector[N] f_location;
-   {
-    vector[M] sqrt_spd = alpha_gp * sqrt(2 * pi()) * rho_gp * exp(-0.25 * square(rho_gp) * lambda);
-
-    f_location = Phi * (sqrt_spd .* z_gp);
-   }
-
-   // Linear Predictor 
-   vector[N] mu;
-        for(i in 1:N){
-            mu[i] = alpha_j[neighbourhoods_id[i]] 
-                    + beta_j[neighbourhoods_id[i]] * super_host[i]
-                    + f_location[i];
-        }
-
+    // Recover the Random Hood effect 
+    vector[N_hoods] alpha_hood = sd_hoods * z_hoods;
+    
+    // Recover HSGP 2D 
+    vector[N] f_location;
+    {
+        // Spectral Density 
+        vector[M] sqrt_spd = alpha_gp * sqrt(2 * pi()) * rho_gp * exp(-0.25 * square(rho_gp) * lambda);
+        f_location = Phi * (sqrt_spd .* z_gp);
+    }
+    
+    // Linear Predictor 
+    vector[N] mu;
+    {   // Recover the correlated parameters one by one 
+        vector[N] hood_group          = alpha_bar        + to_vector(omega[1, hood_groups_id]);
+        vector[N] super_host_effect   = super_host_bar   + to_vector(omega[2, hood_groups_id]) .* to_vector(super_host);
+        vector[N] accommodates_effect = accommodates_bar + to_vector(omega[3, hood_groups_id]) .* accommodates_c;
+        
+        // Hood Intercept offect 
+        vector[N] hood_offcet = alpha_hood[hoods_id];
+        
+        // Compute mu 
+        mu = hood_group + hood_offcet + super_host_effect + accommodates_effect + f_location;
+    }
 }
 // Model 
 model{
-    // Random Intercept Priors
-    alpha_log_price ~ normal(log(30), 0.3);
-    sd_neighbourhoods_log_price ~ exponential(1); 
-    z_alpha ~ std_normal();
+    // Random Correlated Intercept Hood Groups Prior
+    alpha_bar ~ normal(log(240), 0.3);
 
-    // Random Super Host Slope Priors 
-    alpha_super_host_eff ~ normal(0, 1);
-    sd_neighbourhoods_super_host ~ exponential(1);
-    z_super_host ~ std_normal();
+    // Random Correlated Super Host Slope Prior 
+    super_host_bar   ~ normal(0, 1);
 
-    // HSGP 2D Priors 
+    // Random Correlated Accommodates Slope Prior 
+    accommodates_bar ~ normal(0, 1);
+
+    // Correlation Between Hood Groups, Super Host and Accommodates specific Priors 
+    sds ~ exponential(1);
+    Lr  ~ lkj_corr_cholesky(2); 
+    to_vector(z_matrix) ~ std_normal();
+
+    // Random Intercept Hoods Priors
+    sd_hoods ~ exponential(1);
+    z_hoods  ~ std_normal();
+
+    // HSGP 2D Priors
     alpha_gp ~ normal(0, 1);
-    rho_gp ~ inv_gamma(5, 5);
-    z_gp ~ std_normal();
+    rho_gp   ~ inv_gamma(5, 5);
+    z_gp     ~ std_normal();
 
-    // Observation Variations Prior 
+    // Observation Variations 
     sd_obs ~ exponential(1);
 
     // Model Likelihood 
@@ -124,17 +150,10 @@ model{
 generated quantities {
     vector[N] log_lik;
     vector[N] log_price_rep;
-    vector[N] price_rep;
-    vector[N_neighbourhoods] neighbourhood_multiplier;
-
-    for(i in 1:N){
+    matrix[3, 3] Rho = multiply_lower_tri_self_transpose(Lr);
+    
+    for (i in 1:N) {
         log_lik[i]       = normal_lpdf(log_price[i] | mu[i], sd_obs);
         log_price_rep[i] = normal_rng(mu[i], sd_obs);
-        price_rep[i]     = exp(log_price_rep[i]);
     }
-
-    for(j in 1:N_neighbourhoods){
-        neighbourhood_multiplier[j] = exp(alpha_j[j]);
-    }
-
 }
