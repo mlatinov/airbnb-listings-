@@ -102,8 +102,8 @@ simulate_cor_test_model <- function(
 
   ## Random price intercept  
   baseline_price = log(240),
-  sigma_neighbourhood_group_price = 0.6,
-  sigma_neighbourhood_price       = 0.25,
+  sigma_neighbourhood_price = 0.6,
+  sigma_neighbourhood_group_price = 0.25,
   
   ## Random Super Host Slope
   baseline_super_host_eff = 0.12,
@@ -141,13 +141,13 @@ simulate_cor_test_model <- function(
   # Simulate Covariates Superhost and accommodates from Bernoulli and Negative Binomial Distribution 
   super_host   <- rbinom(nrow(ids), size = 1, prob = 0.27)
   accommodates <- pmin(rnbinom(nrow(ids), size = 3, mu = 3.8), 16)
-  accommodates_c <- accommodates - mean(accommodates)
+  accommodates_z <- (accommodates - mean(accommodates)) / sd(accommodates)
 
   ## Model Correlated parameters 
   v <- rsims::make_correlated_effects(
-    n     = n_neighbourhood_groups,
+    n     = n_neighbourhoods,
     means = c(0, 0, 0),
-    sds   = c(sigma_neighbourhood_group_price, sigma_super_host_eff,sigma_acc_eff),
+    sds   = c(sigma_neighbourhood_price, sigma_super_host_eff,sigma_acc_eff),
     correlation_matrix = matrix(
       c(
         1,            cor_price_sh, cor_price_acc, 
@@ -159,12 +159,12 @@ simulate_cor_test_model <- function(
   )
 
   ## Recover the correlated model parameters 
-  alpha_group <- baseline_price          + v[, 1]
-  beta_group  <- baseline_super_host_eff + v[, 2]
-  gamma_group <- baseline_acc_eff        + v[, 3]
+  alpha_hood <- baseline_price          + v[, 1]
+  beta_hood  <- baseline_super_host_eff + v[, 2]
+  gamma_hood <- baseline_acc_eff        + v[, 3]
 
-  # Random Neighbourhood intercept
-  alpha_neighbourhoods <- sigma_neighbourhood_price * rnorm(length(unique(ids$neighbourhoods_id)), 0, 1)
+  # Random Neighbourhood Groups intercept
+  alpha_neighbourhoods_groups <- sigma_neighbourhood_price * rnorm(length(unique(ids$neighbourhood_group_id)), 0, 1)
 
   # Project the coordinates 
   latitude  <- runif(nrow(ids), 41.35, 41.46)
@@ -184,10 +184,10 @@ simulate_cor_test_model <- function(
 
   ## Linear predictor 
   mu_i <- (
-    alpha_group[ids$neighbourhood_group_id] 
-    + alpha_neighbourhoods[ids$neighbourhoods_id]
-    + beta_group[ids$neighbourhood_group_id]  * super_host 
-    + gamma_group[ids$neighbourhood_group_id] * accommodates_c 
+    alpha_hood[ids$neighbourhoods_id] 
+    + alpha_neighbourhoods_groups[ids$neighbourhood_group_id]
+    + beta_hood[ids$neighbourhoods_id]  * super_host 
+    + gamma_hood[ids$neighbourhoods_id] * accommodates_z
     + f_location
   )
     
@@ -271,10 +271,10 @@ simulate_airbnb_v1 <- function(
     prob = c(0.7616, 0.00467, 0.22643, 0.0073)
   )
 
-  ## Center Covariates 
-  accommodates_c      <- accommodates      - mean(accommodates)
-  guest_lead_months_c <- guest_lead_months - mean(guest_lead_months)
-  minimum_nights_c    <- minimum_nights    - mean(minimum_nights)
+  ## Z Score Covariates 
+  accommodates_z      <- (accommodates      - mean(accommodates))      / sd(accommodates)
+  guest_lead_months_z <- (guest_lead_months - mean(guest_lead_months)) / sd(guest_lead_months)
+  minimum_nights_z    <- (minimum_nights    - mean(minimum_nights))    / sd(minimum_nights)
 
   ## Model Correlated parameters 
   v <- rsims::make_correlated_effects(
@@ -328,9 +328,9 @@ simulate_airbnb_v1 <- function(
   mu_i <- (
     alpha_group[ids$neighbourhood_group_id] + alpha_neighbourhoods[ids$neighbourhoods_id]
     + beta_group[ids$neighbourhood_group_id]  * super_host
-    + gamma_group[ids$neighbourhood_group_id] * accommodates_c
-    + beta_guest_lead_months * guest_lead_months_c
-    + beta_minimum_nights    * minimum_nights_c
+    + gamma_group[ids$neighbourhood_group_id] * accommodates_z
+    + beta_guest_lead_months * guest_lead_months_z
+    + beta_minimum_nights    * minimum_nights_z
     + room_effect[room_type]
     + f_location
   )
