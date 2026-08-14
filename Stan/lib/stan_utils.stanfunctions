@@ -1,4 +1,18 @@
 
+// Multithreaded Likelihood and Spectral Density Location Function ===================================
+real multithreaded_normal(
+  array[] int idx_slice, int start, int end, matrix Phi, vector mu, vector y,
+  real sd, vector z_gp, vector sqrt_spd
+){
+  // Calculate the spectral density and the function of location 
+  vector[end - start + 1] f_location_slice = Phi[start:end] * (sqrt_spd .* z_gp);
+
+  // Calculate the full mu from the partial linear prediction and function of location 
+  vector[end - start + 1] mu_full = mu[start:end] + f_location_slice;
+
+  // Return the likelihood 
+  return normal_lpdf(y[start:end] | mu_full, sd);
+}
 // HSGP Functions ================================================
 // 1-D eigenfunction values for one axis: N x M
 matrix phi_1d(vector x, real L, int M) {
