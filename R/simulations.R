@@ -10,12 +10,12 @@ sim_simple_price_model <- function(
 
   ## Random price intercept 
   baseline_price = log(240),
-  sigma_neighbourhood_group_price = 0.6,
-  sigma_neighbourhood_price       = 0.25,
+  sigma_neighbourhood_group_price = 0.8,
+  sigma_neighbourhood_price       = 0.75,
   
   ## Random Super Host Slope
   baseline_super_host_eff = 0.12,
-  sigma_super_host_eff = 0.05,
+  sigma_super_host_eff    = 0.05,
   
   ## Location GP function parameters 
   gp_rho = 2.5,
@@ -25,7 +25,7 @@ sim_simple_price_model <- function(
   m2     = 8,
   
   ## Observation Price variation 
-  sd_obs = 0.5
+  sd_obs = 0.8
 ){
 
   ## Create Indexes 
@@ -93,30 +93,25 @@ sim_simple_price_model <- function(
   return(sim_data)
 }
 
-#### Simulate price ~ a + aj + ak + bjxi + yjxi + f(lat, lon) ... where aj,bj,yj are correlated in the simulation ###
-simulate_cor_test_model <- function(
+#### Simulate price ~ a + aj + ak + bjxi + yjxi + f(lat, lon) ... ###
+simulate_test_model <- function(
   ## Settings 
   n_neighbourhood_groups = 10,
   n_neighbourhoods       = 69,
   obs_per_neighbourhood  = 10,
 
-  ## Random price intercept  
-  baseline_price = log(240),
-  sigma_neighbourhood_price = 0.6,
-  sigma_neighbourhood_group_price = 0.25,
+  ## Random Hood intercept  
+  baseline_price         = log(200),
+  sigma_hood_group_price = 0.25,
+  sigma_hood_price       = 0.30,
   
   ## Random Super Host Slope
-  baseline_super_host_eff = 0.12,
-  sigma_super_host_eff = 0.05,
+  baseline_super_host_eff = 0.25,
+  sigma_super_host_eff    = 0.05,
 
   ## Random Accommodates Slope
-  baseline_acc_eff = 0.1,
+  baseline_acc_eff = 0.35,
   sigma_acc_eff    = 0.01,
-
-  ## Correlation Index 
-  cor_price_acc = 0.6, 
-  cor_price_sh  = 0.1,
-  cor_acc_sh    = 0.1,
   
   ## Location GP function parameters 
   gp_rho = 2.5,
@@ -126,7 +121,7 @@ simulate_cor_test_model <- function(
   m2     = 8,
   
   ## Observation Price variation 
-  sd_obs = 0.5
+  sd_obs = 0.1
 ){
   
   ## Create Indexes 
@@ -137,34 +132,17 @@ simulate_cor_test_model <- function(
       i                   = obs_per_neighbourhood
     )
   )
-  
+
   # Simulate Covariates Superhost and accommodates from Bernoulli and Negative Binomial Distribution 
-  super_host   <- rbinom(nrow(ids), size = 1, prob = 0.27)
-  accommodates <- pmin(rnbinom(nrow(ids), size = 3, mu = 3.8), 16)
+  super_host     <- rbinom(nrow(ids), size = 1, prob = 0.27)
+  accommodates   <- pmin(rnbinom(nrow(ids), size = 3, mu = 3.8), 16)
   accommodates_z <- (accommodates - mean(accommodates)) / sd(accommodates)
 
-  ## Model Correlated parameters 
-  v <- rsims::make_correlated_effects(
-    n     = n_neighbourhoods,
-    means = c(0, 0, 0),
-    sds   = c(sigma_neighbourhood_price, sigma_super_host_eff,sigma_acc_eff),
-    correlation_matrix = matrix(
-      c(
-        1,            cor_price_sh, cor_price_acc, 
-        cor_price_sh, 1,            cor_acc_sh, 
-        cor_price_acc, cor_acc_sh,            1
-      ), 
-      nrow = 3, byrow = TRUE
-    )
-  )
-
   ## Recover the correlated model parameters 
-  alpha_hood <- baseline_price          + v[, 1]
-  beta_hood  <- baseline_super_host_eff + v[, 2]
-  gamma_hood <- baseline_acc_eff        + v[, 3]
-
-  # Random Neighbourhood Groups intercept
-  alpha_neighbourhoods_groups <- sigma_neighbourhood_price * rnorm(length(unique(ids$neighbourhood_group_id)), 0, 1)
+  alpha_hood         <- sigma_hood_price        * rnorm(n_neighbourhoods, 0 ,1)
+  beta_super_host    <- baseline_super_host_eff + sigma_super_host_eff * rnorm(n_neighbourhoods, 0, 1)
+  gamma_accommodates <- baseline_acc_eff        + sigma_acc_eff        * rnorm(n_neighbourhoods, 0, 1) 
+  alpha_hoods_groups <- sigma_hood_group_price  * rnorm(n_neighbourhoods, 0, 1) 
 
   # Project the coordinates 
   latitude  <- runif(nrow(ids), 41.35, 41.46)
@@ -184,10 +162,11 @@ simulate_cor_test_model <- function(
 
   ## Linear predictor 
   mu_i <- (
-    alpha_hood[ids$neighbourhoods_id] 
-    + alpha_neighbourhoods_groups[ids$neighbourhood_group_id]
-    + beta_hood[ids$neighbourhoods_id]  * super_host 
-    + gamma_hood[ids$neighbourhoods_id] * accommodates_z
+    baseline_price 
+    + alpha_hood[ids$neighbourhoods_id]
+    + alpha_hoods_groups[ids$neighbourhood_group_id]
+    + beta_super_host[ids$neighbourhoods_id]    * super_host
+    + gamma_accommodates[ids$neighbourhoods_id] * accommodates_z
     + f_location
   )
     
@@ -214,28 +193,23 @@ simulate_cor_test_model <- function(
 #### Simulate airbnb data .. The same function as cor test model but with full adj set added ####
 simulate_airbnb_v1 <- function(
   ## Settings 
-  n_neighbourhood_groups = 6,
-  n_neighbourhoods = 10,
-  obs_per_neighbourhood = 50,
+  n_neighbourhood_groups = 10,
+  n_neighbourhoods       = 69,
+  obs_per_neighbourhood  = 10,
 
   ## Random price intercept 
-  baseline_price = log(240),
-  sigma_neighbourhood_group_price = 0.6,
-  sigma_neighbourhood_price       = 0.25,
-  
+  baseline_price         = log(200),
+  sigma_hood_group_price = 0.25,
+  sigma_hood_price       = 0.30,
+
   ## Random Super Host Slope
-  baseline_super_host_eff = 0.08,
-  sigma_super_host_eff = 0.03,
+  baseline_super_host_eff = 0.25,
+  sigma_super_host_eff    = 0.05,
 
   ## Random Accommodates Slope
-  baseline_acc_eff = 0.08,
-  sigma_acc_eff = 0.01,
+  baseline_acc_eff = 0.35,
+  sigma_acc_eff    = 0.01,
 
-  ## Correlation Index 
-  cor_price_acc = 0.5,
-  cor_price_sh = 0.1,
-  cor_acc_sh = 0.1,
-  
   ## Location GP function parameters 
   gp_rho = 2.5,
   gp_eta = 1.5,
@@ -245,7 +219,7 @@ simulate_airbnb_v1 <- function(
 
   ## Fixed covariates effects
   beta_guest_lead_months = 0.015,
-  beta_minimum_nights = -0.025,
+  beta_minimum_nights    = -0.025,
 
   ## Observation Price variation 
   sd_obs = 0.1
@@ -260,8 +234,8 @@ simulate_airbnb_v1 <- function(
     )
   )
   ### Simulate Covariates ###
-  super_host   <- rbinom(nrow(ids), size = 1, prob = 0.27)
-  accommodates <- pmin(rnbinom(nrow(ids), size = 3, mu = 3.8), 16)
+  super_host   <- rbinom(nrow(ids),       size = 1, prob = 0.27)
+  accommodates <- pmin(rnbinom(nrow(ids), size = 3,   mu = 3.8), 16)
   guest_lead_months <- rnbinom(nrow(ids), size = 0.2, mu = 9)
   minimum_nights    <- rnbinom(nrow(ids), size = 1.2, mu = 13.5)
   room_type         <- sample(
@@ -276,35 +250,18 @@ simulate_airbnb_v1 <- function(
   guest_lead_months_z <- (guest_lead_months - mean(guest_lead_months)) / sd(guest_lead_months)
   minimum_nights_z    <- (minimum_nights    - mean(minimum_nights))    / sd(minimum_nights)
 
-  ## Model Correlated parameters 
-  v <- rsims::make_correlated_effects(
-    n     = n_neighbourhood_groups,
-    means = c(0, 0, 0),
-    sds   = c(sigma_neighbourhood_group_price, sigma_super_host_eff,sigma_acc_eff),
-    correlation_matrix = matrix(
-      c(
-        1,            cor_price_sh, cor_price_acc, 
-        cor_price_sh, 1,            cor_acc_sh, 
-        cor_price_acc, cor_acc_sh,            1
-      ), 
-      nrow = 3, byrow = TRUE
-    )
-  )
-
   ## Recover the correlated model parameters 
-  alpha_group <- baseline_price          + v[, 1]
-  beta_group  <- baseline_super_host_eff + v[, 2]
-  gamma_group <- baseline_acc_eff        + v[, 3]
-
-  # Random Neighbourhood intercept
-  alpha_neighbourhoods <- sigma_neighbourhood_price * rnorm(length(unique(ids$neighbourhoods_id)), 0, 1)
+  alpha_hood         <- sigma_hood_price        * rnorm(n_neighbourhoods, 0 ,1)
+  beta_super_host    <- baseline_super_host_eff + sigma_super_host_eff * rnorm(n_neighbourhoods, 0, 1)
+  gamma_accommodates <- baseline_acc_eff        + sigma_acc_eff        * rnorm(n_neighbourhoods, 0, 1) 
+  alpha_hoods_groups <- sigma_hood_group_price  * rnorm(n_neighbourhoods, 0, 1) 
 
   ## Room Effect 
   room_effects <- c(
-    "Entire home/apt" = 0.3,  
-    "Hotel room"      = 0.25, 
+    "Entire home/apt" = 0.2,  
+    "Hotel room"      = 0.1, 
     "Private room"    = -0.1,
-    "Shared room"     = -0.3 
+    "Shared room"     = -0.15 
   )
   room_effect <- room_effects[room_type]
 
@@ -326,13 +283,15 @@ simulate_airbnb_v1 <- function(
 
   ## Linear predictor 
   mu_i <- (
-    alpha_group[ids$neighbourhood_group_id] + alpha_neighbourhoods[ids$neighbourhoods_id]
-    + beta_group[ids$neighbourhood_group_id]  * super_host
-    + gamma_group[ids$neighbourhood_group_id] * accommodates_z
-    + beta_guest_lead_months * guest_lead_months_z
-    + beta_minimum_nights    * minimum_nights_z
-    + room_effect[room_type]
+    baseline_price 
+    + alpha_hood[ids$neighbourhoods_id]
+    + alpha_hoods_groups[ids$neighbourhood_group_id]
+    + beta_super_host[ids$neighbourhoods_id]    * super_host
+    + gamma_accommodates[ids$neighbourhoods_id] * accommodates_z
+    + beta_guest_lead_months                    * guest_lead_months_z
+    + beta_minimum_nights                       * minimum_nights_z
     + f_location
+    + room_effect
   )
 
   # Sample from Normal Distribution log price and transform it back 

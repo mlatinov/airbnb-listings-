@@ -10,8 +10,9 @@ data{
     int <lower = 0, upper =1> prior_only;
     int <lower = 2> N_hoods;
     int <lower = 2> N_hood_groups;
-    array[N] int  hoods_id;
-    array[N] int  hood_groups_id;
+    array[N] int    hoods_id;
+    array[N] int    hood_groups_id;
+    array[N] int <lower = 0, upper = 4> room_type_id;
 
     // 2D HSGP Settings 
     int <lower = 1> M1;
@@ -23,6 +24,8 @@ data{
     // Covariates 
     array[N] int <lower = 0, upper = 1  >   super_host;    
     array[N] int <lower = 0, upper = 16 >   accommodates;
+    array[N] int <lower = 0>  guest_lead_months;
+    array[N] int <lower = 0>  minimum_nights;
     
     // Outcome 
     vector[N] log_price;
@@ -30,24 +33,20 @@ data{
 // Data Transformations 
 transformed data {
     // Z_score the non indicator Numerical Covariates 
-    vector[N] accommodates_z = zscore(to_vector(accommodates));
+    vector[N] accommodates_z      = zscore(to_vector(accommodates));
+    vector[N] guest_lead_months_z = zscore(to_vector(guest_lead_months));
+    vector[N] minimum_nights_z    = zscore(to_vector(minimum_nights));
 
     // HSGP 2D Transformations ==============
     int M = M1 * M2;
     real Lx = c * max(abs(x_km)) + 1e-6;
     real Ly = c * max(abs(y_km)) + 1e-6;
-    
-    matrix[N, M1] Px;
-    matrix[N, M2] Py;
-    
-    profile("Phi 1D "){
-    Px = phi_1d(x_km, Lx, M1);
-    Py = phi_1d(y_km, Ly, M2);}
+    matrix[N, M1] Px = phi_1d(x_km, Lx, M1);
+    matrix[N, M2] Py = phi_1d(y_km, Ly, M2);
 
     // Tensor product Basis 
     matrix[N, M] Phi;
     vector[M] lambda;
-    profile("HSGP Tensor Product"){
     {
         int m = 1;
         for(j1 in 1:M1){
@@ -57,86 +56,98 @@ transformed data {
                 m += 1;
             }
         }
-   }}
+   }
 }
 // Model Parameters 
 parameters{
-    // Random Correlated Intercept Hood Parameters
-    real alpha_bar;
-
-    // Random Correlated Super Host Slope Parameters 
-    real super_host_bar;
-
-    // Random Correlated Accommodates Slope Paramters 
-    real accommodates_bar;
-
-    // Correlation Between Hood Groups, Super Host and Accommodates specific paramters 
-    vector <lower = 0.001>[3] sds;
-    cholesky_factor_corr[3]   Lr;
-    matrix[3, N_hoods]  z_matrix;
-
+    // Random Intercept Hood Parameters
+    real                 alpha_bar;
+    real <lower = 0.001> sd_hood;
+    vector[N_hoods]      z_hood;
+    
     // Random Intercept Hoods Groups Parameters
     real <lower = 0.001>   sd_hood_group; 
     vector[N_hood_groups]  z_hood_group;
+
+    // Random Super Host Slope Parameters 
+    real                 super_host_bar;
+    real <lower = 0.001> sd_super_host;
+    vector[N_hoods]      z_super_host;
+
+    // Random Accommodates Slope Paramters 
+    real                 accommodates_bar;
+    real <lower = 0.001> sd_accommodates;
+    vector[N_hoods]      z_accommodates;
 
     // HSGP 2D Parameters 
     real <lower = 0>             alpha_gp;
     real <lower = 0, upper = 30> rho_gp;
     vector[M]                    z_gp;
 
+    // Fixed effects 
+    real                  beta_guest_lead;
+    real                  beta_minimum_nights;
+    sum_to_zero_vector[4] room_effect;
+
     // Observation Variations 
     real <lower = 0.001> sd_obs;
 }
 // Transform Parameters 
 transformed parameters {
-    // Recover the Correlation effect 
-    matrix[3, N_hoods] omega = diag_pre_multiply(sds, Lr) * z_matrix;
 
-    // Recover the Random Hood Group effect 
-    vector[N_hood_groups] alpha_hood_group = sd_hood_group * z_hood_group;
-    
     // Recover HSGP 2D 
     vector[N] f_location;
     profile("Spectral Density"){
     {
         // Spectral Density 
         vector[M] sqrt_spd = alpha_gp * sqrt(2 * pi()) * rho_gp * exp(-0.25 * square(rho_gp) * lambda);
-        f_location = Phi * (sqrt_spd .* z_gp);
+        f_location         = Phi * (sqrt_spd .* z_gp);
     }}
     
     // Linear Predictor 
     vector[N] mu;
-    {   // Recover the correlated parameters one by one 
-        vector[N] hoods               = alpha_bar        + to_vector(omega[1, hoods_id]);
-        vector[N] super_host_effect   = super_host_bar   + to_vector(omega[2, hoods_id]) .* to_vector(super_host);
-        vector[N] accommodates_effect = accommodates_bar + to_vector(omega[3, hoods_id]) .* accommodates_z;
-        
-        // Hood Group Intercept offect 
-        vector[N] hood_group_offcet = alpha_hood_group[hood_groups_id];
-        
+    {   // Recover the parameters one by one 
+        vector[N_hoods]       hood_effect          = sd_hood          * z_hood;
+        vector[N_hoods]       super_host_effect    = super_host_bar   + sd_super_host   * z_super_host;
+        vector[N_hoods]       accommodates_effect  = accommodates_bar + sd_accommodates * z_accommodates;
+        vector[N_hood_groups] hood_group_effect    = sd_hood_group    * z_hood_group;
+
         // Compute mu 
-        mu = hoods + hood_group_offcet + super_host_effect + accommodates_effect + f_location;
+        mu = 
+            alpha_bar + hood_effect[hoods_id]  + hood_group_effect[hood_groups_id]
+            + super_host_effect[hoods_id]     .* to_vector(super_host)
+            + accommodates_effect[hoods_id]   .* accommodates_z
+            + beta_guest_lead                  * guest_lead_months_z
+            + beta_minimum_nights              * minimum_nights_z
+            + f_location
+            + room_effect[room_type_id]; 
     }
 }
 // Model 
 model{
-    // Random Correlated Intercept Hoods Prior
-    alpha_bar ~ normal(log(240), 0.3);
-
-    // Random Correlated Super Host Slope Prior 
-    super_host_bar   ~ normal(0, 1);
-
-    // Random Correlated Accommodates Slope Prior 
-    accommodates_bar ~ normal(0, 1);
-
-    // Correlation Between Hood Groups, Super Host and Accommodates specific Priors 
-    sds ~ exponential(1);
-    Lr  ~ lkj_corr_cholesky(2); 
-    to_vector(z_matrix) ~ std_normal();
-
-    // Random Intercept Hood Groups Priors
-    sd_hood_group ~ exponential(1);
+    // Random Intercept Hood Parameters
+    alpha_bar ~ normal(log(240), 1);
+    sd_hood   ~ exponential(1);
+    z_hood    ~ std_normal();
+    
+    // Random Intercept Hoods Groups Parameters
+    sd_hood_group ~ exponential(1); 
     z_hood_group  ~ std_normal();
+
+    // Random Super Host Slope Parameters 
+    super_host_bar ~ normal(0, 1);
+    sd_super_host  ~ exponential(1);
+    z_super_host   ~ std_normal();
+
+    // Random Accommodates Slope Paramters 
+    accommodates_bar ~ normal(0, 1);
+    sd_accommodates  ~ exponential(1);
+    z_accommodates   ~ std_normal();
+    
+    // Fixed effects 
+    beta_guest_lead     ~ normal(0, 1);
+    beta_minimum_nights ~ normal(0, 1);
+    room_effect         ~ normal(0, 1);
 
     // HSGP 2D Priors
     alpha_gp ~ normal(0, 1);
@@ -157,8 +168,7 @@ model{
 generated quantities {
     vector[N] log_lik;
     vector[N] log_price_rep;
-    matrix[3, 3] Rho = multiply_lower_tri_self_transpose(Lr);
-    
+
     for (i in 1:N) {
         log_lik[i]       = normal_lpdf(log_price[i] | mu[i], sd_obs);
         log_price_rep[i] = normal_rng(mu[i], sd_obs);

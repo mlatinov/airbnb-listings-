@@ -35,8 +35,7 @@ stan_fit_airbnb_v1 <- function(model_data){
   init = function() list(
     alpha_gp = 0.3,
     rho_gp   = 2,
-    z_gp     = rep(0, 8 * 8),
-    Lr       = diag(3)
+    z_gp     = rep(0, 8 * 8)
   )
 
   # Sample from the model 
@@ -81,31 +80,11 @@ stanviz::plot_ppc_error_scatter(
   x = model_data$superhost
 )
 
-
-##### Diagnostics #####
- data = list(
-      # Settings and Indexing 
-      N          = nrow(model_data),
-      prior_only = 0,
-      N_hoods       = length(unique(model_data$neighbourhoods_id)),
-      N_hood_groups = length(unique(model_data$neighbourhood_group_id)),
-      hoods_id       = model_data$neighbourhoods_id, 
-      hood_groups_id = model_data$neighbourhood_group_id,
-      
-      # 2D HSGP Settings 
-      M1 = 8,
-      M2 = 8,
-      x_km = model_data$x_projected,
-      y_km = model_data$y_projected,
-      c    = 1.5,
-      
-      # Covariates 
-      super_host   = model_data$superhost,   
-      accommodates = model_data$accommodates, 
-      
-      # Outcome 
-      log_price = model_data$log_price
-)
-a <- diagnose_gp_funnel(fit = sample, stan_data = data)
-
-## Rho Gp vs z_gp ##
+time <- sample$profiles()
+time_format <- do.call(rbind, time) 
+time_min <- time_format %>%
+  group_by(name) %>%
+  summarise(
+    total_time_sec = sum(total_time),
+    total_time_min = total_time_sec / 60
+  )
