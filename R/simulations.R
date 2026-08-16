@@ -304,15 +304,16 @@ simulate_airbnb_v1 <- function(
     log_price = log(price),
     latitude  = latitude,
     longitude = longitude,
-    y_km  = coords$y_km,
-    x_km  = coords$x_km,
+    y_projected  = coords$y_km,
+    x_projected  = coords$x_km,
     room_type = room_type,
     superhost = super_host,
     accommodates = accommodates,
     minimum_nights = minimum_nights,
     guest_lead_months = guest_lead_months,
     neighbourhood_group_id = ids$neighbourhood_group_id,
-    neighbourhoods_id      = ids$neighbourhoods_id
+    neighbourhoods_id      = ids$neighbourhoods_id,
+    room_type_id           = as.integer(as.factor(room_type))
   )
  return(sim_data)
 }

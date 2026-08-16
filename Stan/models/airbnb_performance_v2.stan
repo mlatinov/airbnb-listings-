@@ -155,9 +155,10 @@ model{
 
     // Model Likelihood 
     if(prior_only == 0){
+        profile("Likelihood"){
         // Normal Distribution Likelihood  
        target += reduce_sum(multithreaded_normal, slicer, 1, Phi, mu, log_price, sd_obs, z_gp, sqrt_spd);
-    }
+    }}
 }
 // Minimal Generated Quantities 
 generated quantities {
