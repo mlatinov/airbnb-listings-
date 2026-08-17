@@ -46,11 +46,17 @@ stan_fit_airbnb_v1 <- function(model_data){
     # HMC Settings 
     parallel_chains = 4,
     iter_sampling = 1000,
-    output_dir    = "Stan/results/",
+    output_dir    = tempdir(),
     seed          = 42,
     # Initialize the sampling from Good Location 
     init = init
   )
+  # Save the results 
+  out_path <- tempfile(fileext = ".rds")
+  sample$save_object(file = out_path) 
+  
+  # Return the outpath 
+  return(out_path)
 }
 
 #### Multithreading Version of Airbnb V1 ####
@@ -103,9 +109,15 @@ stan_fit_airbnb_v2 <- function(model_data){
     parallel_chains = 4,
     threads_per_chain = 2,
     iter_sampling = 1000,
-    output_dir    = "Stan/results/",
+    output_dir    = tempdir(),
     seed          = 42,
     # Initialize the sampling from Good Location 
     init = init
   )
+  # Save the results 
+  out_path <- tempfile(fileext = ".rds")
+  sample$save_object(file = out_path) 
+  
+  # Return the outpath 
+  return(out_path)
 }
