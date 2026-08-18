@@ -1,55 +1,29 @@
 
 #### Functions to Fit Stan Models ####
-stan_fit_airbnb_v1 <- function(model_data){
-
+stan_fit_airbnb <- function(
+  model_data, 
+  prior_only = 0, 
+  stan_file_path, 
+  iter_sampling = 1000,
+  parallel_chains = 4, 
+  set_seed = 42
+){
   # Transform the data into list as the Stan expect 
-  stan_data <- list(
-    # Settings and Indexing 
-    N          = nrow(model_data),
-    prior_only = 0,
-    N_hoods        = length(unique(model_data$neighbourhoods_id)),
-    N_hood_groups  = length(unique(model_data$neighbourhood_group_id)),
-    hoods_id       = model_data$neighbourhoods_id, 
-    hood_groups_id = model_data$neighbourhood_group_id,
-      
-    # 2D HSGP Settings 
-    M1 = 8,
-    M2 = 8,
-    x_km = model_data$x_projected,
-    y_km = model_data$y_projected,
-    c    = 1.5,
-      
-    # Covariates 
-    super_host   = model_data$superhost,   
-    accommodates = model_data$accommodates, 
-    room_type_id = model_data$room_type_id,
-    guest_lead_months = model_data$guest_lead_months,
-    minimum_nights    = model_data$minimum_nights,
-      
-    # Outcome 
-    log_price = model_data$log_price
-  )
+  stan_data <- transform_data_to_stanlist(model_data)
 
   # Compile the Stan model 
-  stan_model <- cmdstanr::cmdstan_model(stan_file = "Stan/models/airbnb_v1.stan")
-
-  # Safe intial function for the 2D HSGP parameters 
-  init = function() list(
-    alpha_gp = 0.3,
-    rho_gp   = 2,
-    z_gp     = rep(0, 8 * 8)
-  )
+  stan_model <- cmdstanr::cmdstan_model(stan_file = stan_file_path)
 
   # Sample from the model 
   sample <- stan_model$sample(
     data = stan_data,
     # HMC Settings 
-    parallel_chains = 4,
-    iter_sampling = 1000,
+    parallel_chains = parallel_chains,
+    iter_sampling = iter_sampling,
     output_dir    = tempdir(),
-    seed          = 42,
+    seed          = set_seed,
     # Initialize the sampling from Good Location 
-    init = init
+    init = safe_stan_init(chains = parallel_chains)
   )
   # Save the results 
   out_path <- tempfile(fileext = ".rds")
@@ -59,60 +33,36 @@ stan_fit_airbnb_v1 <- function(model_data){
   return(out_path)
 }
 
-#### Multithreading Version of Airbnb V1 ####
-stan_fit_airbnb_v2 <- function(model_data){
-    # Transform the data into list as the Stan expect 
-  stan_data <- list(
-    # Settings and Indexing 
-    N          = nrow(model_data),
-    prior_only = 0,
-    N_hoods        = length(unique(model_data$neighbourhoods_id)),
-    N_hood_groups  = length(unique(model_data$neighbourhood_group_id)),
-    hoods_id       = model_data$neighbourhoods_id, 
-    hood_groups_id = model_data$neighbourhood_group_id,
-      
-    # 2D HSGP Settings 
-    M1 = 8,
-    M2 = 8,
-    x_km = model_data$x_projected,
-    y_km = model_data$y_projected,
-    c    = 1.5,
-      
-    # Covariates 
-    super_host   = model_data$superhost,   
-    accommodates = model_data$accommodates, 
-    room_type_id = model_data$room_type_id,
-    guest_lead_months = model_data$guest_lead_months,
-    minimum_nights    = model_data$minimum_nights,
-      
-    # Outcome 
-    log_price = model_data$log_price
-  )
+#### Multithreading Version of Airbnb Stan Model ####
+stan_fit_airbnb_performance <- function(
+  model_data, 
+  prior_only = 0, 
+  stan_file_path, 
+  iter_sampling = 1000,
+  threads_per_chain = 2,
+  parallel_chains = 4,
+  set_seed = 42
+){
+  # Transform the data into list as the Stan expect  
+  stan_data <- transform_data_to_stanlist(model_data, prior_only = prior_only)
 
   # Compile the Stan model 
   stan_model <- cmdstanr::cmdstan_model(
-    stan_file = "Stan/models/airbnb_performance_v2.stan",
+    stan_file = stan_file_path,
     cpp_options = list(stan_threads = TRUE)
-  )
-
-  # Safe intial function for the 2D HSGP parameters 
-  init = function() list(
-    alpha_gp = 0.3,
-    rho_gp   = 2,
-    z_gp     = rep(0, 8 * 8)
   )
 
   # Sample from the model 
   sample <- stan_model$sample(
     data = stan_data,
     # HMC Settings 
-    parallel_chains = 4,
-    threads_per_chain = 2,
-    iter_sampling = 1000,
+    parallel_chains   = parallel_chains,
+    threads_per_chain = threads_per_chain,
+    iter_sampling = iter_sampling,
     output_dir    = tempdir(),
-    seed          = 42,
+    seed          = set_seed,
     # Initialize the sampling from Good Location 
-    init = init
+    init = safe_stan_init(chains = parallel_chains)
   )
   # Save the results 
   out_path <- tempfile(fileext = ".rds")

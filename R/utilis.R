@@ -30,9 +30,6 @@ clean_airbnb_data <- function(data_raw){
       neighbourhood_cleansed,
       neighbourhood_group_cleansed,
       ## Room Features ##
-      bathrooms,
-      bedrooms,
-      beds,
       price,
       room_type,
       accommodates,
@@ -77,7 +74,7 @@ clean_airbnb_data <- function(data_raw){
     ## Remove the Host features which were already used to create new features 
     select(-hosts_time_as_host_years,-hosts_time_as_host_months,-hosts_time_as_user_months,-hosts_time_as_user_years) %>%
     ## Remove the missing values from the price and superhost 
-    filter(!is.na(price), !is.na(superhost))
+    filter(!is.na(price), !is.na(superhost), !is.na(minimum_nights))
 }
 
 #### Function to vizualize distributions of numerical features ####
@@ -219,4 +216,48 @@ compare_relan_z <- function(
     )
   )
   return(compare)
+}
+
+#### Function to take a dataframe and return a list in the expected Stan format Its model dependent ####
+transform_data_to_stanlist <- function(model_data, hsgp_M1 = 8, hsgp_M2 = 8, hsgp_c = 1.5, prior_only = 0){
+  # Transform the data into list as the Stan expect 
+  stan_data <- list(
+    # Settings and Indexing 
+    N          = nrow(model_data),
+    prior_only = prior_only,
+    N_hoods        = length(unique(model_data$neighbourhoods_id)),
+    N_hood_groups  = length(unique(model_data$neighbourhood_group_id)),
+    hoods_id       = model_data$neighbourhoods_id, 
+    hood_groups_id = model_data$neighbourhood_group_id,
+      
+    # 2D HSGP Settings 
+    M1 = hsgp_M1,
+    M2 = hsgp_M2,
+    x_km = model_data$x_projected,
+    y_km = model_data$y_projected,
+    c    = hsgp_c,
+      
+    # Covariates 
+    super_host   = model_data$superhost,   
+    accommodates = model_data$accommodates, 
+    room_type_id = model_data$room_type_id,
+    guest_lead_months = model_data$guest_lead_months,
+    minimum_nights    = model_data$minimum_nights,
+      
+    # Outcome 
+    log_price = model_data$log_price
+  )
+  return(stan_data)
+} 
+
+#### Function for Safe HSGP Initialization for Stan models ####
+safe_stan_init <- function(alpha_gp = 0.3, rho_gp = 2, M1 = 8, M2 = 8, chains = 4){
+  one_chain_init <- list(
+    alpha_gp = alpha_gp,
+    rho_gp   = rho_gp,
+    z_gp     = rep(0, M1 * M2)
+  )
+  # repeat the same init for every chain
+  init <- replicate(chains, one_chain_init, simplify = FALSE)
+  return(init)
 }

@@ -43,6 +43,27 @@ terminate_stan_ec2_instance <- function(instance_id) {
   cat("Terminated instance:", instance_id, "\n")
 }
 
-id <- launch_stan_ec2_instance()
-get_instance_ip(id)
-terminate_stan_ec2_instance(id)
+#### Function to push a local data into S3 ####
+push_data_to_s3 <- function(bucket = "stan-airbnb-s3",key = "raw-data/listings.csv", path_to_data = "data/listings.csv"){
+  s3 <- paws.storage::s3()
+  # Store the data in S3
+  s3$put_object(
+    Bucket = bucket,
+    Key    = key,
+    Body = readBin(path_to_data, "raw", file.info(path_to_data)$size)
+  )
+}
+
+#### Function to get back the data from S3 ####
+get_data_from_s3 <- function(local_path_to_data = "data/listings.csv",bucket = "stan-airbnb-s3", key = "raw-data/listings.csv"){
+  ## Check if the data file is not already present in the listed path ##
+  if (!file.exists(local_path)) {
+    # Create a temp directory for the data 
+    dir.create("data", showWarnings = FALSE)
+    # Get the data back 
+    s3  <- paws.storage::s3()
+    obj <- s3$get_object(Bucket = "stan-airbnb-s3", Key = "raw-data/listings.csv")
+    writeBin(obj$Body, local_path)
+  }
+  local_path_to_data
+}

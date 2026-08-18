@@ -191,7 +191,7 @@ simulate_test_model <- function(
 }
 
 #### Simulate airbnb data .. The same function as cor test model but with full adj set added ####
-simulate_airbnb_v1 <- function(
+simulate_airbnb <- function(
   ## Settings 
   n_neighbourhood_groups = 10,
   n_neighbourhoods       = 69,

@@ -1,6 +1,6 @@
 // Include helpers Stan Functions 
 functions {
-  #include ../lib/stan_utils.stanfunctions
+  #include "../../lib/stan_utils.stanfunctions"
 }
 
 // Data Input Layer 
