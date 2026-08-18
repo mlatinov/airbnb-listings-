@@ -69,11 +69,46 @@ get_data_from_s3 <- function(local_path_to_data = "data/listings.csv",bucket = "
 }
 
 #### Function to remotly launch the pipeline ####
-run_remote_pipeline <- function(ip, key_path = "stan-test-key-2.pem", repo_dir = "airbnb-listings-") {
+run_remote_pipeline <- function(ip, key_path = "~/AWS/stan-test-key-2.pem", repo_dir = "airbnb-listings-") {
   cmd <- sprintf(
-    "ssh -i %s ubuntu@%s 'cd %s && git pull && tmux new -d -s stanrun \"Rscript -e targets::tar_make()\"'",
+    "ssh -o StrictHostKeyChecking=no -i %s ubuntu@%s 'cd %s && git pull && tmux new -d -s stanrun \"Rscript -e targets::tar_make()\"'",
     key_path, ip, repo_dir
   )
   system(cmd)
   cat("Pipeline started in remote tmux session 'stanrun'. SSH in and `tmux attach -t stanrun` to check progress.\n")
+}
+
+#### Function to check if the pipeline is currently running ####
+is_pipeline_running <- function(ip, key_path = "~/AWS/stan-test-key-2.pem") {
+  cmd <- sprintf(
+    "ssh -i %s ubuntu@%s 'tmux has-session -t stanrun 2>/dev/null && echo RUNNING || echo DONE'",
+    key_path, ip
+  )
+  result <- system(cmd, intern = TRUE)
+  result == "RUNNING"
+}
+
+#### Function to return a list of all Running instances ####
+list_running_instances <- function() {
+  ec2 <- paws.compute::ec2()
+  result <- ec2$describe_instances(
+    Filters = list(list(Name = "instance-state-name", Values = list("running")))
+  )
+  ids <- unlist(lapply(result$Reservations, function(r) sapply(r$Instances, function(i) i$InstanceId)))
+  ips <- unlist(lapply(result$Reservations, function(r) sapply(r$Instances, function(i) i$PublicIpAddress)))
+  data.frame(instance_id = ids, public_ip = ips)
+}
+
+#### Function to inspect and kill the instance once the pipeline is done ####
+kill_finished_pipeline <- function(ip, check_min = 5){
+  # Check every t is the pipeline finished 
+  while (is_pipeline_running(ip)) {
+  cat("Still running...\n")
+  
+  # Set the sysmtem to sleep before cheking again 
+  Sys.sleep(check_min * 60)  
+  }
+  cat("Pipeline finished.\n")
+  # Teminate the pipeline 
+  terminate_stan_ec2_instance(id)
 }

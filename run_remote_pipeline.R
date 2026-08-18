@@ -8,4 +8,4 @@ ip <- get_instance_ip(id)$public_ip
 run_remote_pipeline(ip)
 
 # Terminate
-terminate_stan_ec2_instance(id)
+kill_finished_pipeline(ip, check_min = 5)
