@@ -62,8 +62,18 @@ get_data_from_s3 <- function(local_path_to_data = "data/listings.csv",bucket = "
     dir.create("data", showWarnings = FALSE)
     # Get the data back 
     s3  <- paws.storage::s3()
-    obj <- s3$get_object(Bucket = "stan-airbnb-s3", Key = "raw-data/listings.csv")
+    obj <- s3$get_object(Bucket = bucket, Key = key)
     writeBin(obj$Body, local_path)
   }
   local_path_to_data
+}
+
+#### Function to remotly launch the pipeline ####
+run_remote_pipeline <- function(ip, key_path = "stan-test-key-2.pem", repo_dir = "airbnb-listings-") {
+  cmd <- sprintf(
+    "ssh -i %s ubuntu@%s 'cd %s && git pull && tmux new -d -s stanrun \"Rscript -e targets::tar_make()\"'",
+    key_path, ip, repo_dir
+  )
+  system(cmd)
+  cat("Pipeline started in remote tmux session 'stanrun'. SSH in and `tmux attach -t stanrun` to check progress.\n")
 }

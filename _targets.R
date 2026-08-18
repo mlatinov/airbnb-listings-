@@ -10,6 +10,7 @@ library(paws.compute)
 tar_source("R/utilis.R")
 tar_source("R/simulations.R")
 tar_source("R/fit_stan.R")
+tar_source("R/aws_utilis.R")
 
 #### AWS Integration ####
 tar_option_set(
@@ -23,7 +24,7 @@ list(
   ## Load the Raw data 
   tar_target(
     name = data_raw,
-    command = read_csv("data/listings.csv")
+    command = get_data_from_s3()
   ),
   ## Clean and subset the raw data 
   tar_target(
