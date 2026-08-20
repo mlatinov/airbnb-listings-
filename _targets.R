@@ -14,6 +14,7 @@ tar_source("R/aws_utilis.R")
 
 #### AWS Integration ####
 tar_option_set(
+  repository_meta = "aws",
   resources = tar_resources(
     aws = tar_resources_aws(bucket = "stan-airbnb-s3",prefix = "intial_run")
   )

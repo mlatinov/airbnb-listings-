@@ -110,12 +110,40 @@ list_running_instances <- function() {
   data.frame(instance_id = ids, public_ip = ips)
 }
 
+#### Function to check the pipeline status ####
+fetch_pipeline_status <- function(ip, key_path = "~/AWS/stan-test-key-2.pem", repo_dir = "airbnb-listings-") {
+  local_path <- tempfile()
+  cmd <- sprintf("scp -o StrictHostKeyChecking=no -i %s ubuntu@%s:~/%s/pipeline_status.txt %s",
+                 key_path, ip, repo_dir, local_path)
+  system(cmd)
+  as.integer(trimws(readLines(local_path)))
+}
+
+#### Function to fetch the pipeline log from the remote instance ####
+fetch_pipeline_log <- function(ip, key_path = "~/AWS/stan-test-key-2.pem", repo_dir = "airbnb-listings-") {
+  local_path <- tempfile(fileext = ".txt")
+  cmd <- sprintf(
+    "scp -o StrictHostKeyChecking=no -i %s ubuntu@%s:~/%s/pipeline_log.txt %s",
+    key_path, ip, repo_dir, local_path
+  )
+  system(cmd)
+  cat(readLines(local_path), sep = "\n")
+}
+
 #### Function to inspect and kill the instance once the pipeline is done ####
 kill_finished_pipeline <- function(ip, instance_id, check_min = 5){
   while (is_pipeline_running(ip)) {
     cat("Still running...\n")
     Sys.sleep(check_min * 60)
   }
-  cat("Pipeline finished.\n")
-  terminate_stan_ec2_instance(instance_id)
+  cat("Session ended. Fetching log and status...\n")
+  fetch_pipeline_log(ip)
+  status <- fetch_pipeline_status(ip)
+  
+  if (status == 0) {
+    cat("Pipeline succeeded. Terminating instance.\n")
+    terminate_stan_ec2_instance(instance_id)
+  } else {
+    cat("Pipeline FAILED (exit code", status, "). Instance left running for debugging — terminate manually once reviewed.\n")
+  }
 }
