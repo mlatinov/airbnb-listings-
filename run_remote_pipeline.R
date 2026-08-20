@@ -8,4 +8,4 @@ ip <- get_instance_ip(id)$public_ip
 run_remote_pipeline(ip)
 
 # Terminate
-kill_finished_pipeline(ip, check_min = 5)
+kill_finished_pipeline(ip,instance_id = id,check_min = 5)

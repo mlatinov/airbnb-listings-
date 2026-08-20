@@ -80,12 +80,23 @@ run_remote_pipeline <- function(ip, key_path = "~/AWS/stan-test-key-2.pem", repo
 
 #### Function to check if the pipeline is currently running ####
 is_pipeline_running <- function(ip, key_path = "~/AWS/stan-test-key-2.pem") {
-  cmd <- sprintf(
-    "ssh -i %s ubuntu@%s 'tmux has-session -t stanrun 2>/dev/null && echo RUNNING || echo DONE'",
-    key_path, ip
+  result <- tryCatch(
+    system(
+      sprintf("ssh -o StrictHostKeyChecking=no -i %s ubuntu@%s 'tmux has-session -t stanrun 2>/dev/null && echo RUNNING || echo DONE'",
+              key_path, ip),
+      intern = TRUE
+    ),
+    error = function(e) {
+      warning("SSH check failed: ", conditionMessage(e))
+      "ERROR"
+    }
   )
-  result <- system(cmd, intern = TRUE)
-  result == "RUNNING"
+  if (length(result) == 0 || result[1] == "ERROR") {
+    warning("Could not determine pipeline status — treating as still running to be safe")
+    return(TRUE)  #  assume running rather than falsely triggering termination
+  }
+  
+  result[1] == "RUNNING"
 }
 
 #### Function to return a list of all Running instances ####
@@ -100,15 +111,11 @@ list_running_instances <- function() {
 }
 
 #### Function to inspect and kill the instance once the pipeline is done ####
-kill_finished_pipeline <- function(ip, check_min = 5){
-  # Check every t is the pipeline finished 
+kill_finished_pipeline <- function(ip, instance_id, check_min = 5){
   while (is_pipeline_running(ip)) {
-  cat("Still running...\n")
-  
-  # Set the sysmtem to sleep before cheking again 
-  Sys.sleep(check_min * 60)  
+    cat("Still running...\n")
+    Sys.sleep(check_min * 60)
   }
   cat("Pipeline finished.\n")
-  # Teminate the pipeline 
-  terminate_stan_ec2_instance(id)
+  terminate_stan_ec2_instance(instance_id)
 }
