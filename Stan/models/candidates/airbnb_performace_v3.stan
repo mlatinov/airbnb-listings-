@@ -1,14 +1,13 @@
 /*
- Airbnb Performance Version 1 Baseline Model
- Integrates random effects on the hood level for the intercept superhost effect and accommodates
- Its the baseline optimized model with multithreaded normal distribution. All random effects are NCP 
- and the model itself integrades Hilbert Space Gaussian Process in the 2D space over the coordinates of the 
- airbnb locations to account for spatial confouding. The Usage of 2D HSGP instead of exact 2D GP is requared because
- of the large sample size. The captuared level of spatial featured are controled by M1 and M2 for the projected coordinates.
- The choice of 8 by 8 captures mostly large spactial features of the location as location relative to the hot spots but it does not 
- capture highly localized spatial features like exact popular location Increasing the Ms will lead to better capturing of those features
- but also will requare more computing power and time. 
+Airbnb Performace Model Version 3 Includes interactions between the covariates.
+ 1 : Accommodates x Room Type Informed by the Sample data. There is a potential for interaction effect 
+    such as. Shared room and Hotel Room are not showing as strong relantionship betweeen Log Price and Accmmodates
+
+ The model as of now follows the structure of Airbnb Performance Model Version 1 such are the placing of the random effects and the 
+ 2D HSGP implementation.Possibe further extention will be replacing the structure with the Airbnb Performance Version 2 with extendet random effects.
+ Read the comperison Documents to see more 
 */
+
 // Include helpers Stan Functions 
 functions {
   #include "../../lib/stan_utils.stanfunctions"
@@ -93,6 +92,9 @@ parameters{
     real <lower = 0.001> sd_accommodates;
     vector[N_hoods]      z_accommodates;
 
+    // Interaction effect  Accommodates x Room Type 
+    vector[4] beta_accommodates_x_room_type;
+
     // HSGP 2D Parameters 
     real <lower = 0>             alpha_gp;
     real <lower = 0, upper = 30> rho_gp;
@@ -119,6 +121,7 @@ transformed parameters {
         vector[N_hoods]       super_host_effect    = super_host_bar   + sd_super_host   * z_super_host;
         vector[N_hoods]       accommodates_effect  = accommodates_bar + sd_accommodates * z_accommodates;
         vector[N_hood_groups] hood_group_effect    = sd_hood_group    * z_hood_group;
+        vector[4]             accommodates_x_room  = beta_accommodates_x_room_type     .* z_accommodates;
 
         // Compute mu 
         mu = 
@@ -127,7 +130,8 @@ transformed parameters {
             + accommodates_effect[hoods_id]   .* accommodates_z
             + beta_guest_lead                  * guest_lead_months_z
             + beta_minimum_nights              * minimum_nights_z
-            + room_effect[room_type_id]; 
+            + room_effect[room_type_id]
+            + accommodates_x_room[room_type_id]; 
     }
 }
 // Model 
@@ -155,6 +159,9 @@ model{
     beta_guest_lead     ~ normal(0, 1);
     beta_minimum_nights ~ normal(0, 1);
     room_effect         ~ normal(0, 1);
+
+    // Interaction effects 
+    beta_accommodates_x_room_type ~ normal(0, 1);
 
     // HSGP 2D Priors
     alpha_gp ~ normal(0, 1);

@@ -1,14 +1,12 @@
 /*
- Airbnb Performance Version 1 Baseline Model
- Integrates random effects on the hood level for the intercept superhost effect and accommodates
- Its the baseline optimized model with multithreaded normal distribution. All random effects are NCP 
- and the model itself integrades Hilbert Space Gaussian Process in the 2D space over the coordinates of the 
- airbnb locations to account for spatial confouding. The Usage of 2D HSGP instead of exact 2D GP is requared because
- of the large sample size. The captuared level of spatial featured are controled by M1 and M2 for the projected coordinates.
- The choice of 8 by 8 captures mostly large spactial features of the location as location relative to the hot spots but it does not 
- capture highly localized spatial features like exact popular location Increasing the Ms will lead to better capturing of those features
- but also will requare more computing power and time. 
+Airbnb Performace version 2 Model Extends the Heirarclical Effects of the Covariates 
+ Every standartized covariate gets its own random effect on the hood level as every random effect being a 
+ NCP (Non Centered Parametarization) following the pattern of aj = a_bar + sigma_group * z_group
+ This model have more the most parameters of all competitor models and will be used for comaprison and later 
+ model selection against smaller model candidates. Like the rest of the model candidates the model itself have all 
+ covariates needed as the adjustment set requares. All the other features from Airbnb Performace Version 1 are kept.
 */
+
 // Include helpers Stan Functions 
 functions {
   #include "../../lib/stan_utils.stanfunctions"
