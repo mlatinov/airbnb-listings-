@@ -71,11 +71,11 @@ get_data_from_s3 <- function(local_path_to_data = "data/listings.csv",bucket = "
 #### Function to remotly launch the pipeline ####
 run_remote_pipeline <- function(ip, key_path = "~/AWS/stan-test-key-2.pem", repo_dir = "airbnb-listings-") {
   cmd <- sprintf(
-    "ssh -o StrictHostKeyChecking=no -i %s ubuntu@%s 'cd %s && git pull && tmux new -d -s stanrun \"Rscript -e targets::tar_make()\"'",
+    "ssh -o StrictHostKeyChecking=no -i %s ubuntu@%s 'cd %s && git pull && tmux new -d -s stanrun bash run_pipeline.sh'",
     key_path, ip, repo_dir
   )
   system(cmd)
-  cat("Pipeline started in remote tmux session 'stanrun'. SSH in and `tmux attach -t stanrun` to check progress.\n")
+  cat("Pipeline started in remote tmux session 'stanrun'.\n")
 }
 
 #### Function to check if the pipeline is currently running ####
