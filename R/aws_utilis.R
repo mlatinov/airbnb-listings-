@@ -57,13 +57,13 @@ push_data_to_s3 <- function(bucket = "stan-airbnb-s3",key = "raw-data/listings.c
 #### Function to get back the data from S3 ####
 get_data_from_s3 <- function(local_path_to_data = "data/listings.csv",bucket = "stan-airbnb-s3", key = "raw-data/listings.csv"){
   ## Check if the data file is not already present in the listed path ##
-  if (!file.exists(local_path)) {
+  if (!file.exists(local_path_to_data)) {
     # Create a temp directory for the data 
     dir.create("data", showWarnings = FALSE)
     # Get the data back 
     s3  <- paws.storage::s3()
     obj <- s3$get_object(Bucket = bucket, Key = key)
-    writeBin(obj$Body, local_path)
+    writeBin(obj$Body, local_path_to_data)
   }
   local_path_to_data
 }
